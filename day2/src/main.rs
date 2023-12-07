@@ -21,7 +21,7 @@ impl Game {
         };
     }
 
-    fn bound(&self) -> Cubes {
+    fn min_set(&self) -> Cubes {
         let mut cubes = Cubes {
             red: 0,
             green: 0,
@@ -64,6 +64,10 @@ impl Cubes {
         }
         return cubes;
     }
+
+    fn power(&self) -> u32 {
+        self.red * self.green * self.blue
+    }
 }
 
 fn main() {
@@ -89,16 +93,18 @@ fn main() {
         }
     }
 
-    let answer: u32 = games
+    let part1_answer: u32 = games
         .iter()
         .filter(|g| {
-            let bound = g.bound();
+            let bound = g.min_set();
             bound.red <= 12 && bound.green <= 13 && bound.blue <= 14
         })
-        .map(|g| 
-            g.index
-        )
+        .map(|g| g.index)
         .sum();
 
-    println!("Answer: {:?}", answer);
+    println!("Part 1: {:?}", part1_answer);
+
+    let part2_answer: u32 = games.iter().map(|g| g.min_set().power()).sum();
+
+    println!("Part 1: {:?}", part2_answer);
 }
