@@ -41,13 +41,7 @@ fn main() {
                         }
                     }
                     if let Some(p) = pos {
-                        let s = &line[p.start..p.end];
-                        let n: u32 = s.parse().unwrap();
-                        if last_sym.is_some() && is_near(&last_sym.unwrap(), &p) {
-                            sum += n
-                        } else {
-                            this_line_num.push(Num::new(p, n));
-                        }
+                        process_this_line_num(&line, p, last_sym, &mut sum, &mut this_line_num);
                         pos = None
                     }
                 }
@@ -55,13 +49,7 @@ fn main() {
         }
 
         if let Some(p) = pos {
-            let s = &line[p.start..p.end];
-            let n: u32 = s.parse().unwrap();
-            if last_sym.is_some() && is_near(&last_sym.unwrap(), &p) {
-                sum += n
-            } else {
-                this_line_num.push(Num::new(p, n));
-            }
+            process_this_line_num(&line, p, last_sym, &mut sum, &mut this_line_num)
         }
 
         'outer: for num in last_line_num.iter() {
@@ -91,6 +79,22 @@ fn main() {
     }
 
     println!("Answer: {}", sum)
+}
+
+fn process_this_line_num(
+    line: &str,
+    pos: Pos,
+    last_sym: Option<usize>,
+    sum: &mut u32,
+    nums: &mut Vec<Num>,
+) {
+    let s = &line[pos.start..pos.end];
+    let n: u32 = s.parse().unwrap();
+    if last_sym.is_some() && is_near(&last_sym.unwrap(), &pos) {
+        *sum += n
+    } else {
+        nums.push(Num::new(pos, n));
+    }
 }
 
 fn is_near(i: &usize, pos: &Pos) -> bool {
