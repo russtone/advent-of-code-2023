@@ -3,7 +3,7 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-fn main() {
+fn calc(num_fn: fn(&Num) -> u32, sym_fn: fn(&Sym) -> u32) -> u32 {
     let file = match File::open("./files/input.txt") {
         Ok(file) => file,
         Err(err) => {
@@ -44,30 +44,67 @@ fn main() {
             for num in nums.iter_mut() {
                 for sym in syms.iter_mut() {
                     if is_adjacent(sym, num) {
-                        sym.adjacent_nums_count += 1;
                         match sym.first_two_adjacent_nums {
-                            (None, None) => sym.first_two_adjacent_nums = (Some(num.value), None),
-                            (Some(n1), None) => {
-                                sym.first_two_adjacent_nums = (Some(n1), Some(num.value))
+                            (None, None) => {
+                                sym.first_two_adjacent_nums = (Some(num.clone()), None);
+                                sym.adjacent_nums_count += 1;
                             }
-                            _ => {}
+                            (Some(n1), None) => {
+                                if num.pos != n1.pos {
+                                    sym.first_two_adjacent_nums = (Some(n1), Some(num.clone()));
+                                    sym.adjacent_nums_count += 1;
+                                }
+                            }
+                            (Some(n1), Some(n2)) => {
+                                if num.pos != n1.pos && num.pos != n2.pos {
+                                    sym.adjacent_nums_count += 1;
+                                }
+                            }
+                            _ => panic!("must never happen"),
                         }
-                        num.is_inclued = true;
+                        num.has_adjacent_sym = true;
                     }
                 }
             }
 
             for num in nums
                 .iter()
-                .filter(|n| (n.pos.row == (i - 2) || lines.peek().is_none()) && n.is_inclued)
+                .filter(|n| (n.pos.row == (i - 2) || lines.peek().is_none()))
             {
-                sum += num.value;
+                sum += num_fn(num)
             }
             nums.retain(|n| n.pos.row > (i - 2));
+
+            for sym in syms
+                .iter()
+                .filter(|s| (s.pos.row == (i - 2) || lines.peek().is_none()))
+            {
+                sum += sym_fn(sym)
+            }
+            syms.retain(|s| s.pos.row > (i - 2));
         }
     }
 
-    println!("Answer: {}", sum)
+    return sum;
+}
+
+fn main() {
+    println!(
+        "Part 1: {}",
+        calc(|n| if n.has_adjacent_sym { n.value } else { 0 }, |_| 0)
+    );
+    println!(
+        "Part 2: {}",
+        calc(
+            |_| 0,
+            |s| if s.adjacent_nums_count == 2 {
+                s.first_two_adjacent_nums.0.unwrap().value
+                    * s.first_two_adjacent_nums.1.unwrap().value
+            } else {
+                0
+            }
+        )
+    )
 }
 
 fn parse_and_save(line: &str, pos: &Option<Pos>, nums: &mut Vec<Num>) {
@@ -85,7 +122,7 @@ fn is_adjacent(sym: &Sym, num: &Num) -> bool {
         && sym.pos.start <= num.pos.end
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Pos {
     row: usize,
     start: usize,
@@ -98,11 +135,11 @@ impl Pos {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Num {
     pos: Pos,
     value: u32,
-    is_inclued: bool,
+    has_adjacent_sym: bool,
 }
 
 impl Num {
@@ -110,7 +147,7 @@ impl Num {
         Num {
             pos,
             value,
-            is_inclued: false,
+            has_adjacent_sym: false,
         }
     }
 }
@@ -119,7 +156,7 @@ impl Num {
 struct Sym {
     pos: Pos,
     adjacent_nums_count: u32,
-    first_two_adjacent_nums: (Option<u32>, Option<u32>),
+    first_two_adjacent_nums: (Option<Num>, Option<Num>),
 }
 
 impl Sym {
