@@ -4,18 +4,59 @@ use std::{
 };
 
 fn main() -> io::Result<()> {
+    println!("Part 1: {}", part1()?);
+    println!("Part 2: {}", part2()?);
+
+    Ok(())
+}
+
+fn part1() -> io::Result<u32> {
     let file = File::open("./files/input.txt")?;
     let lines = BufReader::new(file).lines();
-    let mut sum: u32 = 0;
+    let mut points: u32 = 0;
+
+    let base: u32 = 2;
+    for line in lines {
+        let card = Card::from_string(&line?).unwrap();
+        let matches = card.matches();
+        points += if matches == 0 {
+            0
+        } else {
+            base.pow(matches - 1)
+        };
+    }
+
+    Ok(points)
+}
+
+fn part2() -> io::Result<u32> {
+    let file = File::open("./files/input.txt")?;
+    let lines = BufReader::new(file).lines();
+    let mut cards_count: u32 = 0;
+    let mut counters: Vec<u32> = Vec::new();
 
     for line in lines {
         let card = Card::from_string(&line?).unwrap();
-        sum += card.points();
+
+        let mut copies_count: u32 = 1;
+        for c in counters.iter_mut() {
+            copies_count += 1;
+            *c -= 1;
+        }
+        counters.retain(|c| *c != 0);
+
+        cards_count += copies_count;
+
+        let matches = card.matches();
+
+        if matches > 0 {
+            for _ in 0..copies_count {
+                counters.push(matches);
+            }
+        }
     }
 
-    println!("Answer: {}", sum);
-
-    Ok(())
+    Ok(cards_count)
 }
 
 #[derive(Debug, Clone)]
@@ -38,17 +79,17 @@ impl Card {
         })
     }
 
-    fn points(&self) -> u32 {
+    fn matches(&self) -> u32 {
         let mut li: usize = 0;
         let mut ri: usize = 0;
-        let mut points: u32 = 0;
+        let mut matches: u32 = 0;
 
         while li < self.left.len() && ri < self.right.len() {
             let lv = self.left[li];
             let rv = self.right[ri];
 
             if lv == rv {
-                points = if points == 0 { 1 } else { points * 2 };
+                matches += 1;
                 li += 1;
                 ri += 1;
             } else if lv < rv {
@@ -58,7 +99,7 @@ impl Card {
             }
         }
 
-        return points;
+        return matches;
     }
 }
 
