@@ -3,6 +3,8 @@ use itertools::Itertools;
 use std::{
     fs::File,
     io::{self, BufRead, BufReader},
+    sync::Arc,
+    thread::{self, JoinHandle},
 };
 
 fn main() -> Result<(), Error> {
@@ -59,7 +61,6 @@ fn part2() -> Result<u64, Error> {
     let mut seed_ranges: Vec<(u64, u64)> = Vec::new();
     let mut maps: Vec<Map> = Vec::new();
     let mut map: Option<Map> = None;
-    let mut min: u64 = u64::MAX;
 
     for line in lines {
         let line = line?;
@@ -82,19 +83,39 @@ fn part2() -> Result<u64, Error> {
         maps.push(map);
     }
 
-    for (start, count) in seed_ranges {
-        for seed in start..(start + count) {
-            let mut res: u64 = seed;
-            for map in maps.iter() {
-                res = map.apply(res)
-            }
-            if res < min {
-                min = res
-            }
+    let arc_maps = Arc::new(maps);
+
+    let cores_count = thread::available_parallelism()?.get();
+    let mut res: Vec<u64> = Vec::new();
+
+    for chunk in &seed_ranges.iter().chunks(cores_count) {
+        let mut handles: Vec<JoinHandle<u64>> = Vec::new();
+        for (start, count) in chunk {
+            let maps = arc_maps.clone();
+            let start = *start;
+            let count = *count;
+            let handle = thread::spawn(move || {
+                let mut min = u64::MAX;
+                for seed in start..(start + count) {
+                    let mut res: u64 = seed;
+                    for map in maps.iter() {
+                        res = map.apply(res)
+                    }
+                    if res < min {
+                        min = res
+                    }
+                }
+                return min;
+            });
+            handles.push(handle);
+        }
+        for handle in handles.into_iter() {
+            let n = handle.join().unwrap();
+            res.push(n);
         }
     }
 
-    Ok(min)
+    Ok(*res.iter().min().unwrap())
 }
 
 fn parse_seeds(s: &str) -> Result<Vec<u64>, Error> {
