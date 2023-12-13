@@ -1,15 +1,23 @@
 use core::num;
+use itertools::Itertools;
 use std::{
     fs::File,
     io::{self, BufRead, BufReader},
 };
 
 fn main() -> Result<(), Error> {
+    println!("Part 1: {}", part1()?);
+    println!("Part 2: {}", part2()?);
+    Ok(())
+}
+
+fn part1() -> Result<u64, Error> {
     let file = File::open("./files/input.txt")?;
     let lines = BufReader::new(file).lines();
     let mut seeds: Vec<u64> = Vec::new();
     let mut maps: Vec<Map> = Vec::new();
     let mut map: Option<Map> = None;
+    let mut min: u64 = u64::MAX;
 
     for line in lines {
         let line = line?;
@@ -32,15 +40,61 @@ fn main() -> Result<(), Error> {
         maps.push(map);
     }
 
-    for map in maps.iter() {
-        for seed in seeds.iter_mut() {
-            *seed = map.apply(*seed)
+    for seed in seeds.iter() {
+        let mut res: u64 = *seed;
+        for map in maps.iter() {
+            res = map.apply(res)
+        }
+        if res < min {
+            min = res
         }
     }
 
-    println!("Answer: {}", seeds.iter().min().unwrap());
+    Ok(min)
+}
 
-    Ok(())
+fn part2() -> Result<u64, Error> {
+    let file = File::open("./files/input.txt")?;
+    let lines = BufReader::new(file).lines();
+    let mut seed_ranges: Vec<(u64, u64)> = Vec::new();
+    let mut maps: Vec<Map> = Vec::new();
+    let mut map: Option<Map> = None;
+    let mut min: u64 = u64::MAX;
+
+    for line in lines {
+        let line = line?;
+        if line.starts_with("seeds: ") {
+            seed_ranges = parse_seed_ranges(line.strip_prefix("seeds: ").unwrap())?;
+        } else if line.ends_with(" map:") {
+            map = parse_map(line.strip_suffix(" map:").unwrap()).ok();
+        } else if line.is_empty() {
+            if let Some(map) = map {
+                maps.push(map);
+            }
+            map = None
+        } else {
+            if let Some(ref mut map) = map {
+                map.ranges.push(parse_range(&line)?);
+            }
+        }
+    }
+    if let Some(map) = map {
+        maps.push(map);
+    }
+
+    for (start, count) in seed_ranges {
+        for seed in start..(start + count) {
+            let mut res: u64 = seed;
+            for map in maps.iter() {
+                res = map.apply(res)
+            }
+            if res < min {
+                min = res
+            }
+        }
+    }
+
+    Ok(min)
 }
 
 fn parse_seeds(s: &str) -> Result<Vec<u64>, Error> {
@@ -49,6 +103,15 @@ fn parse_seeds(s: &str) -> Result<Vec<u64>, Error> {
         nums.push(ns.parse()?);
     }
     Ok(nums)
+}
+
+fn parse_seed_ranges(s: &str) -> Result<Vec<(u64, u64)>, Error> {
+    let mut res: Vec<(u64, u64)> = Vec::new();
+
+    for (start, count) in s.split_whitespace().into_iter().tuples().into_iter() {
+        res.push((start.parse()?, count.parse()?));
+    }
+    Ok(res)
 }
 
 fn parse_map(s: &str) -> Result<Map, Error> {
@@ -125,7 +188,7 @@ struct Range {
 
 impl Range {
     fn contains(&self, src: u64) -> bool {
-        src >= self.source && src <= self.source + self.count
+        src >= self.source && src < self.source + self.count
     }
 
     fn apply(&self, src: u64) -> u64 {
