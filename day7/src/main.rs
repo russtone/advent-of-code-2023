@@ -25,9 +25,9 @@ fn main() -> Result<(), Error> {
     }
 
     println!("Answer: {}", res);
-
     Ok(())
 }
+
 
 #[derive(Debug)]
 enum Error {
@@ -110,26 +110,47 @@ struct Hand {
 
 impl Hand {
     fn get_combination(&self) -> Combination {
-        let mut cards = self.cards.clone();
+        let mut cards = self.cards.clone().to_vec();
+
+        #[cfg(feature = "jocker")]
+        {
+            cards = cards
+                .into_iter()
+                .filter(|c| *c != Card::Jocker)
+                .collect::<Vec<Card>>();
+        }
+
         cards.sort();
 
-        let mut prev: Card = cards[0];
+        let mut prev: Option<Card> = None;
         let mut count: u32 = 1;
         let mut combs: Vec<(Card, u32)> = Vec::new();
+        #[cfg(feature = "jocker")]
+        let jockers: u32 = 5 - cards.len() as u32;
 
-        for i in 1..5 {
-            let card = cards[i];
-            if prev == card {
-                count += 1;
-            } else {
-                combs.push((prev, count));
-                count = 1;
+        for card in cards {
+            if let Some(prev) = prev {
+                if prev == card {
+                    count += 1;
+                } else {
+                    combs.push((prev, count));
+                    count = 1;
+                }
             }
-            prev = card;
+            prev = Some(card);
         }
-        combs.push((prev, count));
+        if let Some(prev) = prev {
+            combs.push((prev, count));
+        }
 
         combs.sort_by_key(|c| c.1);
+
+        #[cfg(feature = "jocker")]
+        if let Some(last) = combs.last_mut() {
+            last.1 += jockers;
+        } else {
+            combs.push((Card::Ace, 5));
+        }
 
         let orig_cards = self.cards.into_iter().collect_tuple().unwrap();
 
@@ -179,6 +200,8 @@ impl FromStr for Hand {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Card {
+    #[cfg(feature = "jocker")]
+    Jocker,
     Two,
     Three,
     Four,
@@ -188,6 +211,7 @@ enum Card {
     Eight,
     Nine,
     Ten,
+    #[cfg(not(feature = "jocker"))]
     Jack,
     Queen,
     King,
@@ -203,6 +227,8 @@ impl FromStr for Card {
     type Err = ParseCardError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            #[cfg(feature = "jocker")]
+            "J" => Ok(Card::Jocker),
             "2" => Ok(Card::Two),
             "3" => Ok(Card::Three),
             "4" => Ok(Card::Four),
@@ -212,6 +238,7 @@ impl FromStr for Card {
             "8" => Ok(Card::Eight),
             "9" => Ok(Card::Nine),
             "T" => Ok(Card::Ten),
+            #[cfg(not(feature = "jocker"))]
             "J" => Ok(Card::Jack),
             "Q" => Ok(Card::Queen),
             "K" => Ok(Card::King),
