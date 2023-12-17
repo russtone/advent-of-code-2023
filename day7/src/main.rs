@@ -1,4 +1,5 @@
 use core::num;
+use itertools::Itertools;
 use std::{
     fs::File,
     io::{self, BufRead, BufReader},
@@ -21,7 +22,6 @@ fn main() -> Result<(), Error> {
     for (i, row) in rows.iter().enumerate() {
         let rank: u32 = (i + 1) as u32;
         res += row.bid * rank;
-        println!("{} {} {:?}", rank, row.bid, row.hand.get_combination());
     }
 
     println!("Answer: {}", res);
@@ -94,13 +94,13 @@ impl FromStr for Row {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Combination {
-    Nothing(Card, Card, Card, Card, Card),
-    Pair(Card, (Card, Card, Card)),
-    TwoPairs(Card, Card, Card),
-    Three(Card, (Card, Card)),
-    FullHouse(Card, Card),
-    Four(Card, Card),
-    Five(Card),
+    Nothing((Card, Card, Card, Card, Card)),
+    Pair((Card, Card, Card, Card, Card)),
+    TwoPairs((Card, Card, Card, Card, Card)),
+    Three((Card, Card, Card, Card, Card)),
+    FullHouse((Card, Card, Card, Card, Card)),
+    Four((Card, Card, Card, Card, Card)),
+    Five((Card, Card, Card, Card, Card)),
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -110,34 +110,37 @@ struct Hand {
 
 impl Hand {
     fn get_combination(&self) -> Combination {
-        let mut prev: Card = self.cards[0];
+        let mut cards = self.cards.clone();
+        cards.sort();
+
+        let mut prev: Card = cards[0];
         let mut count: u32 = 1;
-        let mut cards: Vec<(Card, u32)> = Vec::new();
+        let mut combs: Vec<(Card, u32)> = Vec::new();
 
         for i in 1..5 {
-            let card = self.cards[i];
+            let card = cards[i];
             if prev == card {
                 count += 1;
             } else {
-                cards.push((prev, count));
+                combs.push((prev, count));
                 count = 1;
             }
             prev = card;
         }
-        cards.push((prev, count));
+        combs.push((prev, count));
 
-        cards.sort_by_key(|c| c.1);
+        combs.sort_by_key(|c| c.1);
 
-        match cards[..] {
-            [(c1, 1), (c2, 1), (c3, 1), (c4, 1), (c5, 1)] => {
-                Combination::Nothing(c5, c4, c3, c2, c1)
-            }
-            [(c1, 1), (c2, 1), (c3, 1), (c4, 2)] => Combination::Pair(c4, (c3, c2, c1)),
-            [(c1, 1), (c2, 2), (c3, 2)] => Combination::TwoPairs(c3, c2, c1),
-            [(c1, 1), (c2, 1), (c3, 3)] => Combination::Three(c3, (c2, c1)),
-            [(c1, 2), (c2, 3)] => Combination::FullHouse(c2, c1),
-            [(c1, 1), (c2, 4)] => Combination::Four(c2, c1),
-            [(c1, 5)] => Combination::Five(c1),
+        let orig_cards = self.cards.into_iter().collect_tuple().unwrap();
+
+        match combs[..] {
+            [(_, 1), (_, 1), (_, 1), (_, 1), (_, 1)] => Combination::Nothing(orig_cards),
+            [(_, 1), (_, 1), (_, 1), (_, 2)] => Combination::Pair(orig_cards),
+            [(_, 1), (_, 2), (_, 2)] => Combination::TwoPairs(orig_cards),
+            [(_, 1), (_, 1), (_, 3)] => Combination::Three(orig_cards),
+            [(_, 2), (_, 3)] => Combination::FullHouse(orig_cards),
+            [(_, 1), (_, 4)] => Combination::Four(orig_cards),
+            [(_, 5)] => Combination::Five(orig_cards),
             _ => panic!("invalid combination"),
         }
     }
@@ -169,8 +172,6 @@ impl FromStr for Hand {
             let card: Card = c.to_string().parse()?;
             cards[i] = card;
         }
-
-        cards.sort();
 
         return Ok(Hand { cards });
     }
