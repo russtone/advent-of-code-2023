@@ -28,7 +28,6 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
-
 #[derive(Debug)]
 enum Error {
     Io(io::Error),
