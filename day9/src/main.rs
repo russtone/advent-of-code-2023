@@ -1,12 +1,21 @@
 use core::num;
 use std::{
     fs::File,
-    io::{self, BufRead, BufReader},
+    io::{self, BufRead, BufReader, Cursor, Read, Seek, SeekFrom},
 };
 
 fn main() -> Result<(), Error> {
-    let file = File::open("files/input.txt")?;
-    let lines = BufReader::new(file).lines();
+    let mut file = File::open("files/input.txt")?;
+
+    println!("{}", ext(&mut file, next)?);
+    file.seek(SeekFrom::Start(0))?;
+    println!("{}", ext(&mut file, prev)?);
+
+    Ok(())
+}
+
+fn ext<R: Read>(buf: &mut R, f: fn(&Vec<Vec<i32>>) -> i32) -> Result<i32, Error> {
+    let lines = BufReader::new(buf).lines();
     let mut res: i32 = 0;
 
     for line in lines {
@@ -23,16 +32,25 @@ fn main() -> Result<(), Error> {
             vecs.push(nums.clone());
         }
 
-        let mut n: i32 = 0;
-        for v in vecs.iter().rev().skip(1) {
-            n += v.last().unwrap();
-        }
-        res += n;
+        res += f(&vecs);
     }
+    Ok(res)
+}
 
-    println!("{}", res);
+fn next(vecs: &Vec<Vec<i32>>) -> i32 {
+    let mut n: i32 = 0;
+    for v in vecs.iter().rev().skip(1) {
+        n += v.last().unwrap();
+    }
+    n
+}
 
-    Ok(())
+fn prev(vecs: &Vec<Vec<i32>>) -> i32 {
+    let mut n: i32 = 0;
+    for v in vecs.iter().rev().skip(1) {
+        n = v.first().unwrap() - n;
+    }
+    n
 }
 
 #[derive(Debug)]
@@ -75,5 +93,16 @@ mod tests {
 
         let s: &str = "1 -2 3 -4";
         assert_eq!(parse_line(s), Ok(vec![1, -2, 3, -4]));
+    }
+
+    #[test]
+    fn test_next() {
+        assert_eq!(ext(&mut Cursor::new("1 2 3 4"), next).unwrap(), 5);
+    }
+
+    #[test]
+    fn test_prev() {
+        assert_eq!(ext(&mut Cursor::new("1 2 3 4"), prev).unwrap(), 0);
+        assert_eq!(ext(&mut Cursor::new("1 4 7 10"), prev).unwrap(), -2);
     }
 }
