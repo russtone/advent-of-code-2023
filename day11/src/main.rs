@@ -1,13 +1,23 @@
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::BTreeSet,
     fs::File,
-    io::{self, BufRead, BufReader, Read},
+    io::{self, BufRead, BufReader, Read, Seek, SeekFrom},
 };
 
 fn main() -> Result<(), Error> {
-    let file = File::open("files/input.txt")?;
+    let mut file = File::open("files/input.txt")?;
 
-    let universe = Universe::from_buf(file)?;
+    println!("Part 1: {}", solve(&mut file, 2)?);
+
+    file.seek(SeekFrom::Start(0))?;
+
+    println!("Part 2: {}", solve(&mut file, 1000000)?);
+
+    Ok(())
+}
+
+fn solve<R: Read>(buf: &mut R, expansion_coeff: usize) -> Result<usize, Error> {
+    let universe = Universe::from_buf(buf, expansion_coeff)?;
     let mut res: usize = 0;
     let n = universe.galaxies.len();
 
@@ -16,13 +26,9 @@ fn main() -> Result<(), Error> {
             let a = universe.galaxies[i];
             let b = universe.galaxies[j];
             res += Universe::distance(a, b);
-            // println!("{:?} {:?} {}", a, b, Universe::distance(a, b))
         }
     }
-
-    println!("{}", res);
-
-    Ok(())
+    Ok(res)
 }
 
 #[derive(Debug)]
@@ -38,13 +44,11 @@ impl From<io::Error> for Error {
 
 #[derive(Debug)]
 struct Universe {
-    rows: usize,
-    cols: usize,
     galaxies: Vec<(usize, usize)>,
 }
 
 impl Universe {
-    fn from_buf<R: Read>(buf: R) -> Result<Self, Error> {
+    fn from_buf<R: Read>(buf: R, expansion_coeff: usize) -> Result<Self, Error> {
         let lines = BufReader::new(buf).lines();
         let mut rows: usize = 0;
         let mut cols: usize = 0;
@@ -74,15 +78,11 @@ impl Universe {
         }
 
         for (row, col) in &mut galaxies {
-            *row = *row + expanded_rows.range(..*row).count();
-            *col = *col + expanded_cols.range(..*col).count();
+            *row = *row + (expansion_coeff - 1) * expanded_rows.range(..*row).count();
+            *col = *col + (expansion_coeff - 1) * expanded_cols.range(..*col).count();
         }
 
-        Ok(Universe {
-            rows,
-            cols,
-            galaxies,
-        })
+        Ok(Universe { galaxies })
     }
 
     fn distance(a: (usize, usize), b: (usize, usize)) -> usize {
