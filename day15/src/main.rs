@@ -1,4 +1,4 @@
-use std::{error, fs::File, io::Read};
+use std::{collections::HashMap, error, fs::File, io::Read};
 
 type Result<T> = std::result::Result<T, Box<dyn error::Error>>;
 
@@ -8,7 +8,42 @@ fn main() -> Result<()> {
     file.read_to_string(&mut contents)?;
     let s = contents.trim_end();
 
-    println!("{}", hash_seq(s));
+    println!("Part 1: {}", hash_seq(s));
+
+    let mut boxes: HashMap<u64, Vec<(String, u64)>> = HashMap::new();
+
+    s.split(",").for_each(|cmd| {
+        if cmd.ends_with("-") {
+            let label = cmd.strip_suffix("-").unwrap();
+            boxes
+                .entry(hash(&label))
+                .and_modify(|e| e.retain(|(l, _)| l != label));
+        } else {
+            let (label, flen) = cmd.split_once("=").unwrap();
+            let value = (label.to_string(), flen.parse().unwrap());
+
+            boxes
+                .entry(hash(&label))
+                .and_modify(|e| {
+                    if let Some(element) = e.iter_mut().find(|x| x.0 == label) {
+                        *element = value.to_owned();
+                    } else {
+                        e.push(value.to_owned())
+                    }
+                })
+                .or_insert(vec![value]);
+        }
+    });
+
+    let mut res: u64 = 0;
+
+    for (bi, lenses) in &boxes {
+        for (i, (_, flen)) in lenses.iter().enumerate() {
+            res += (bi + 1) * (i as u64 + 1) * flen;
+        }
+    }
+
+    println!("Part 2: {}", res);
 
     Ok(())
 }
