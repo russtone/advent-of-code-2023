@@ -71,8 +71,6 @@ fn main() -> Result<()> {
     let energized: HashSet<(isize, isize)> = seen.iter().map(|beam| (beam.row, beam.col)).collect();
 
     println!("{}", energized.len());
-    // 8112
-
 
     Ok(())
 }
