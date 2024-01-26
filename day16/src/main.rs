@@ -13,11 +13,52 @@ fn main() -> Result<()> {
     let lines = BufReader::new(file).lines();
 
     let map: Vec<Vec<char>> = lines.map(|line| line.unwrap().chars().collect()).collect();
+
+    println!(
+        "Part 1: {}",
+        count_energized(&map, &Beam::new(0, 0, Direction::Right))
+    );
+
+    println!(
+        "Part 2: {}",
+        entry_points(&map)
+            .iter()
+            .map(|beam| count_energized(&map, beam))
+            .max()
+            .unwrap()
+    );
+
+    Ok(())
+}
+
+fn entry_points(map: &Vec<Vec<char>>) -> Vec<Beam> {
+    let mut res = Vec::new();
+    let rows = map.len();
+    let cols = map[0].len();
+
+    for col in 0..cols {
+        res.push(Beam::new(0, col as isize, Direction::Down));
+        res.push(Beam::new((rows - 1) as isize, col as isize, Direction::Up))
+    }
+
+    for row in 0..rows {
+        res.push(Beam::new(row as isize, 0, Direction::Right));
+        res.push(Beam::new(
+            row as isize,
+            (cols - 1) as isize,
+            Direction::Right,
+        ));
+    }
+
+    res
+}
+
+fn count_energized(map: &Vec<Vec<char>>, start: &Beam) -> usize {
     let rows = map.len() as isize;
     let cols = map[0].len() as isize;
 
     let mut seen: HashSet<Beam> = HashSet::new();
-    let mut beams: VecDeque<Beam> = vec![Beam::new(0, 0, Direction::Right)].into();
+    let mut beams: VecDeque<Beam> = vec![*start].into();
 
     while let Some(mut beam) = beams.pop_front() {
         if seen.contains(&beam) {
@@ -70,9 +111,7 @@ fn main() -> Result<()> {
 
     let energized: HashSet<(isize, isize)> = seen.iter().map(|beam| (beam.row, beam.col)).collect();
 
-    println!("{}", energized.len());
-
-    Ok(())
+    energized.len()
 }
 
 fn print_map(map: &Vec<Vec<char>>, energized: &HashSet<(isize, isize)>) {
