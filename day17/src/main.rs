@@ -22,7 +22,14 @@ fn main() -> Result<()> {
         .collect::<Vec<Vec<u32>>>()
         .into();
 
-    let start = Point::new(0, 0, Direction::Right, MAX_COMBO);
+    println!("Part 1: {}", solve(&map, 1, 3));
+    println!("Part 2: {}", solve(&map, 4, 10));
+
+    Ok(())
+}
+
+fn solve(map: &Map, min_moves: u32, max_moves: u32) -> u32 {
+    let start = Point::new(0, 0, Direction::Right, max_moves);
     let mut queue = BinaryHeap::new();
     queue.push(Node::new(start, 0));
 
@@ -48,7 +55,7 @@ fn main() -> Result<()> {
                 break;
             }
 
-            for np in get_next(&map, &p).iter() {
+            for np in get_next(&map, &p, min_moves, max_moves).iter() {
                 let new_gs = g_scores.get(&p).unwrap() + map.data[np.row][np.col];
                 let old_gs = *g_scores.get(&np).unwrap_or(&u32::MAX);
 
@@ -68,15 +75,10 @@ fn main() -> Result<()> {
         }
     }
 
-    println!(
-        "Part 1: {}",
-        path.iter()
-            .skip(1)
-            .map(|p| map.data[p.row][p.col])
-            .sum::<u32>()
-    );
-
-    Ok(())
+    path.iter()
+        .skip(1)
+        .map(|p| map.data[p.row][p.col])
+        .sum::<u32>()
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -140,16 +142,16 @@ fn h(map: &Map, p: &Point) -> u32 {
     (map.rows - p.row) as u32 + (map.cols - p.col) as u32
 }
 
-fn get_next(map: &Map, point: &Point) -> Vec<Point> {
+fn get_next(map: &Map, point: &Point, min_moves: u32, max_moves: u32) -> Vec<Point> {
     let mut res = Vec::new();
 
     if let Some(p) = continue_straight(map, point) {
         res.push(p)
     }
-    if let Some(p) = turn_left(map, point) {
+    if let Some(p) = turn_left(map, point, min_moves, max_moves) {
         res.push(p)
     }
-    if let Some(p) = turn_right(map, point) {
+    if let Some(p) = turn_right(map, point, min_moves, max_moves) {
         res.push(p)
     }
 
@@ -170,12 +172,16 @@ fn continue_straight(map: &Map, point: &Point) -> Option<Point> {
     }
 }
 
-fn turn_left(map: &Map, point: &Point) -> Option<Point> {
+fn turn_left(map: &Map, point: &Point, min_moves: u32, max_moves: u32) -> Option<Point> {
+    if (max_moves - point.moves_left) < min_moves {
+        return None;
+    }
+
     let mut p = Point::new(
         point.row,
         point.col,
         point.direction.turn_left(),
-        MAX_COMBO - 1,
+        max_moves - 1,
     );
 
     if do_move(map, &mut p) {
@@ -185,12 +191,16 @@ fn turn_left(map: &Map, point: &Point) -> Option<Point> {
     }
 }
 
-fn turn_right(map: &Map, point: &Point) -> Option<Point> {
+fn turn_right(map: &Map, point: &Point, min_moves: u32, max_moves: u32) -> Option<Point> {
+    if (max_moves - point.moves_left) < min_moves {
+        return None;
+    }
+
     let mut p = Point::new(
         point.row,
         point.col,
         point.direction.turn_right(),
-        MAX_COMBO - 1,
+        max_moves - 1,
     );
 
     if do_move(map, &mut p) {
@@ -292,8 +302,6 @@ impl Display for Direction {
         }
     }
 }
-
-const MAX_COMBO: u32 = 3;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Hash, Ord)]
 struct Point {
