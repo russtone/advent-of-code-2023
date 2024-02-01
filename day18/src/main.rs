@@ -2,26 +2,41 @@ use core::num;
 use std::{
     collections::HashSet,
     fs::File,
-    io::{self, BufRead, BufReader},
-    str::FromStr,
+    io::{self, BufRead, BufReader, Read, Seek, SeekFrom},
 };
 
 fn main() -> Result<(), Error> {
-    let file = File::open("files/input.txt")?;
-    let reader = BufReader::new(file);
+    let mut file = File::open("files/input.txt")?;
 
-    let instructions: Result<Vec<Instruction>, Error> = reader
-        .lines()
-        .map(|line| line?.parse::<Instruction>())
-        .collect();
+    println!("Part 1: {}", solve(&mut file, parse1)?);
+
+    file.seek(SeekFrom::Start(0))?;
+
+    println!("Part 2: {}", solve(&mut file, parse2)?);
+
+    Ok(())
+}
+
+fn solve<R: Read>(
+    buf: &mut R,
+    parse: fn(&str) -> Result<Instruction, Error>,
+) -> Result<u32, Error> {
+    let reader = BufReader::new(buf);
+
+    let instructions: Result<Vec<Instruction>, Error> =
+        reader.lines().map(|line| parse(&line?)).collect();
 
     let instructions = instructions?;
 
+    calc(&instructions)
+}
+
+fn calc(instructions: &[Instruction]) -> Result<u32, Error> {
     let mut cur = (0, 0);
     let mut border: HashSet<(isize, isize)> = HashSet::new();
     border.insert(cur);
 
-    for inst in &instructions {
+    for inst in instructions {
         for _ in 0..inst.steps {
             match inst.direction {
                 Direction::Up => cur.0 -= 1,
@@ -40,7 +55,6 @@ fn main() -> Result<(), Error> {
     let max_col = border.iter().map(|p| p.1).max().unwrap() + 1;
 
     let mut res = 0;
-
 
     for row in min_row..max_row {
         let mut cross = 0;
@@ -71,11 +85,10 @@ fn main() -> Result<(), Error> {
                 res += 1;
             }
         }
+        println!("{}/{}", row, max_row);
     }
 
-    println!("{}", res);
-
-    Ok(())
+    Ok(res)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -98,57 +111,63 @@ enum Direction {
     Right,
 }
 
-impl FromStr for Direction {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "U" => Ok(Direction::Up),
-            "D" => Ok(Direction::Down),
-            "L" => Ok(Direction::Left),
-            "R" => Ok(Direction::Right),
-            _ => Err(Error::ParseError(
-                format!("invalid direction {}", s).to_owned(),
-            )),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 struct Instruction {
     direction: Direction,
     steps: usize,
-    color: String,
 }
 
-impl FromStr for Instruction {
-    type Err = Error;
+fn parse1(s: &str) -> Result<Instruction, Error> {
+    let mut parts = s.split_whitespace();
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.split_whitespace();
+    let direction_str = parts.next().ok_or(Error::ParseError(
+        format!("direction is missing: {}", s).to_owned(),
+    ))?;
 
-        let direction: Direction = parts
-            .next()
-            .ok_or(Error::ParseError(
-                format!("direction is missing: {}", s).to_owned(),
-            ))?
-            .parse()?;
+    let direction: Direction = match direction_str {
+        "U" => Direction::Up,
+        "D" => Direction::Down,
+        "L" => Direction::Left,
+        "R" => Direction::Right,
+        _ => {
+            return Err(Error::ParseError(
+                format!("invalid direction {}", s).to_owned(),
+            ))
+        }
+    };
 
-        let steps: usize = parts
-            .next()
-            .ok_or(Error::ParseError(
-                format!("steps missing: {}", s).to_owned(),
-            ))?
-            .parse()?;
+    let steps: usize = parts
+        .next()
+        .ok_or(Error::ParseError(
+            format!("steps missing: {}", s).to_owned(),
+        ))?
+        .parse()?;
 
-        let color = parts.next().ok_or(Error::ParseError(
-            format!("color is missing: {}", s).to_owned(),
-        ))?;
+    Ok(Instruction { direction, steps })
+}
 
-        Ok(Instruction {
-            direction,
-            steps,
-            color: color[1..color.len() - 1].to_owned(),
-        })
-    }
+fn parse2(s: &str) -> Result<Instruction, Error> {
+    let mut parts = s.split_whitespace();
+    parts.next();
+    parts.next();
+
+    let color = parts.next().ok_or(Error::ParseError(
+        format!("color is missing: {}", s).to_owned(),
+    ))?;
+
+    let hex = &color[2..color.len() - 1];
+    let steps = usize::from_str_radix(&hex[0..5], 16)?;
+    let direction = match hex.chars().last().unwrap() {
+        '0' => Direction::Right,
+        '1' => Direction::Down,
+        '2' => Direction::Left,
+        '3' => Direction::Up,
+        _ => {
+            return Err(Error::ParseError(
+                format!("invalid direction {}", s).to_owned(),
+            ))
+        }
+    };
+
+    Ok(Instruction { direction, steps })
 }
