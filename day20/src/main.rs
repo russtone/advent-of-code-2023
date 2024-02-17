@@ -11,31 +11,107 @@ fn main() -> Result<()> {
     let mut file = File::open("files/input.txt").map_err(|_| "can't open file")?;
     let mut machine = parse(&mut file)?;
 
-    let mut signals: VecDeque<(String, String, Pulse)> = VecDeque::new();
+    println!("Part1: {}", part1::solve(&mut machine)?);
 
-    let mut low: u64 = 0;
-    let mut high: u64 = 0;
+    machine.reset();
 
-    for _ in 0..1000 {
-        signals.push_back(("button".to_string(), "broadcaster".to_string(), Pulse::Low));
-
-        while let Some((from, to, pulse)) = signals.pop_front() {
-            // println!("{} -{}-> {}", from, pulse, to);
-            match pulse {
-                Pulse::Low => low += 1,
-                Pulse::High => high += 1,
-            }
-            machine.modules.entry(to).and_modify(|m| {
-                m.send((&from, pulse)).iter().for_each(|out| {
-                    signals.push_back((m.name().to_string(), out.0.to_string(), out.1))
-                });
-            });
-        }
-    }
-
-    println!("{}", low * high);
+    println!("Part2: {:?}", part2::solve(&mut machine)?);
 
     Ok(())
+}
+
+mod part2 {
+    use super::*;
+
+    pub fn solve(machine: &mut Machine) -> Result<u64> {
+        let outputs: Vec<&str> = vec!["jz", "ft", "sv", "ng"];
+        let mut counts: Vec<u64> = Vec::new();
+
+        for output in outputs {
+            counts.push(part2::count(machine, |from, to, pulse| {
+                from == output && to == "xm" && pulse == Pulse::High
+            })?);
+            machine.reset();
+        }
+
+        let mut res = counts[0];
+
+        for i in 1..counts.len() {
+            res = lcm(res, counts[i]);
+        }
+
+        Ok(res)
+    }
+
+    fn count<F>(machine: &mut Machine, break_when: F) -> Result<u64>
+    where
+        F: Fn(&str, &str, Pulse) -> bool,
+    {
+        let mut signals: VecDeque<(String, String, Pulse)> = VecDeque::new();
+
+        let mut c: u64 = 0;
+
+        'outer: loop {
+            signals.push_back(("button".to_string(), "broadcaster".to_string(), Pulse::Low));
+            c += 1;
+
+            while let Some((from, to, pulse)) = signals.pop_front() {
+                if break_when(&from, &to, pulse) {
+                    break 'outer;
+                }
+                machine.modules.entry(to).and_modify(|m| {
+                    m.send((&from, pulse)).iter().for_each(|out| {
+                        signals.push_back((m.name().to_string(), out.0.to_string(), out.1))
+                    });
+                });
+            }
+        }
+        Ok(c)
+    }
+
+    pub fn lcm(a: u64, b: u64) -> u64 {
+        (a * b) / gcd(a, b)
+    }
+
+    pub fn gcd(a: u64, b: u64) -> u64 {
+        let mut a = a;
+        let mut b = b;
+        while b != 0 {
+            if b < a {
+                std::mem::swap(&mut b, &mut a);
+            }
+            b %= a;
+        }
+        a
+    }
+}
+
+mod part1 {
+    use super::*;
+
+    pub fn solve(machine: &mut Machine) -> Result<u64> {
+        let mut signals: VecDeque<(String, String, Pulse)> = VecDeque::new();
+
+        let mut low: u64 = 0;
+        let mut high: u64 = 0;
+
+        for _ in 0..1000 {
+            signals.push_back(("button".to_string(), "broadcaster".to_string(), Pulse::Low));
+
+            while let Some((from, to, pulse)) = signals.pop_front() {
+                match pulse {
+                    Pulse::Low => low += 1,
+                    Pulse::High => high += 1,
+                }
+                machine.modules.entry(to).and_modify(|m| {
+                    m.send((&from, pulse)).iter().for_each(|out| {
+                        signals.push_back((m.name().to_string(), out.0.to_string(), out.1))
+                    });
+                });
+            }
+        }
+        Ok(low * high)
+    }
 }
 
 fn parse<R: Read>(buf: &mut R) -> Result<Machine> {
@@ -88,6 +164,32 @@ struct Machine {
     modules: HashMap<String, Box<dyn Module>>,
 }
 
+impl Machine {
+    fn graphviz(&self) -> String {
+        let mut res = String::new();
+
+        res.push_str("digraph Machine {\n");
+
+        for m in self.modules.values() {
+            res.push_str(&m.graphviz_node());
+        }
+
+        for m in self.modules.values() {
+            res.push_str(&m.graphviz_edges());
+        }
+
+        res.push_str("}\n");
+
+        res
+    }
+
+    fn reset(&mut self) {
+        for m in self.modules.values_mut() {
+            m.reset();
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Pulse {
     Low,
@@ -107,6 +209,9 @@ trait Module: Debug {
     fn name(&self) -> &str;
     fn add_input(&mut self, name: &str);
     fn send(&mut self, signal: (&str, Pulse)) -> Vec<(String, Pulse)>;
+    fn reset(&mut self);
+    fn graphviz_node(&self) -> String;
+    fn graphviz_edges(&self) -> String;
 }
 
 #[derive(Debug)]
@@ -127,6 +232,8 @@ impl Module for Broadcaster {
         "broadcaster"
     }
 
+    fn add_input(&mut self, _name: &str) {}
+
     fn send(&mut self, (_, pulse): (&str, Pulse)) -> Vec<(String, Pulse)> {
         self.outputs
             .iter()
@@ -134,7 +241,19 @@ impl Module for Broadcaster {
             .collect::<Vec<(String, Pulse)>>()
     }
 
-    fn add_input(&mut self, name: &str) {}
+    fn reset(&mut self) {}
+
+    fn graphviz_node(&self) -> String {
+        format!("\"{}\" [shape=circle];\n", self.name())
+    }
+
+    fn graphviz_edges(&self) -> String {
+        let mut s = String::new();
+        for output in &self.outputs {
+            s.push_str(&format!("\"{}\" -> \"{}\";\n", self.name(), output));
+        }
+        s
+    }
 }
 
 #[derive(Debug)]
@@ -159,6 +278,8 @@ impl Module for FlipFlop {
         &self.name
     }
 
+    fn add_input(&mut self, _name: &str) {}
+
     fn send(&mut self, (_, pulse): (&str, Pulse)) -> Vec<(String, Pulse)> {
         if pulse == Pulse::Low {
             self.on = !self.on;
@@ -178,7 +299,25 @@ impl Module for FlipFlop {
         vec![]
     }
 
-    fn add_input(&mut self, name: &str) {}
+    fn reset(&mut self) {
+        self.on = false;
+    }
+
+    fn graphviz_node(&self) -> String {
+        format!(
+            "\"{}\" [shape=box,style=filled,fillcolor={}];\n",
+            self.name(),
+            if self.on { "green" } else { "white" }
+        )
+    }
+
+    fn graphviz_edges(&self) -> String {
+        let mut s = String::new();
+        for output in &self.outputs {
+            s.push_str(&format!("\"{}\" -> \"{}\";\n", self.name(), output));
+        }
+        s
+    }
 }
 
 #[derive(Debug)]
@@ -221,6 +360,24 @@ impl Module for Conjunction {
                 )
             })
             .collect::<Vec<(String, Pulse)>>()
+    }
+
+    fn reset(&mut self) {
+        self.inputs
+            .values_mut()
+            .for_each(|v: &mut Pulse| *v = Pulse::Low)
+    }
+
+    fn graphviz_node(&self) -> String {
+        format!("\"{}\" [shape=diamond];\n", self.name())
+    }
+
+    fn graphviz_edges(&self) -> String {
+        let mut s = String::new();
+        for output in &self.outputs {
+            s.push_str(&format!("\"{}\" -> \"{}\";\n", self.name(), output));
+        }
+        s
     }
 }
 
