@@ -1,41 +1,52 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Read},
 };
 
 type Result<T> = std::result::Result<T, &'static str>;
 
 fn main() -> Result<()> {
-    let file = File::open("files/input.txt").map_err(|_| "can't open file")?;
-    let lines = BufReader::new(file).lines();
-    let mut bricks: BTreeSet<Brick> = BTreeSet::new();
+    let mut file = File::open("files/input.txt").map_err(|_| "can't open file")?;
 
-    let mut id = 0;
-    for line in lines {
-        let line = line.map_err(|_| "can't get line")?;
+    let mut bricks = parse(&mut file)?;
+    let (settled, supports, supported_by) = drop(&mut bricks);
 
-        if let Some((left, right)) = line.split_once("~") {
-            let l: Vec<usize> = left
-                .split(',')
-                .map(|num| num.parse::<usize>().unwrap())
-                .collect();
+    println!("Part1: {}", part1(&settled, &supports, &supported_by));
 
-            let r: Vec<usize> = right
-                .split(',')
-                .map(|num| num.parse::<usize>().unwrap())
-                .collect();
+    Ok(())
+}
 
-            let first = Coord3::new(l[0], l[1], l[2]);
-            let second = Coord3::new(r[0], r[1], r[2]);
+fn part1(
+    settled: &BTreeSet<Brick>,
+    supports: &BTreeMap<u32, BTreeSet<u32>>,
+    supported_by: &BTreeMap<u32, BTreeSet<u32>>,
+) -> u64 {
+    let mut res = 0;
 
-            assert!(first.z <= second.z);
-
-            bricks.insert(Brick::new(id, first, second));
-            id += 1;
+    for b in settled.iter().rev() {
+        if let Some(sup) = supports.get(&b.id) {
+            if sup
+                .iter()
+                .all(|id| supported_by.get(id).is_some_and(|ids| ids.len() > 1))
+            {
+                res += 1;
+            }
+        } else {
+            res += 1;
         }
     }
 
+    res
+}
+
+fn drop(
+    bricks: &mut BTreeSet<Brick>,
+) -> (
+    BTreeSet<Brick>,
+    BTreeMap<u32, BTreeSet<u32>>,
+    BTreeMap<u32, BTreeSet<u32>>,
+) {
     let mut z_edges: BTreeMap<usize, BTreeSet<Edge>> = BTreeMap::new();
     let mut settled: BTreeSet<Brick> = BTreeSet::new();
     let mut supports: BTreeMap<u32, BTreeSet<u32>> = BTreeMap::new();
@@ -98,23 +109,39 @@ fn main() -> Result<()> {
         settled.insert(brick);
     }
 
-    let mut res = 0;
+    (settled, supports, supported_by)
+}
 
-    for b in settled.iter().rev() {
-        if let Some(sup) = supports.get(&b.id) {
-            if sup
-                .iter()
-                .all(|id| supported_by.get(id).is_some_and(|ids| ids.len() > 1))
-            {
-                res += 1;
-            }
-        } else {
-            res += 1;
+fn parse<R: Read>(buf: &mut R) -> Result<BTreeSet<Brick>> {
+    let lines = BufReader::new(buf).lines();
+    let mut bricks: BTreeSet<Brick> = BTreeSet::new();
+
+    let mut id = 0;
+    for line in lines {
+        let line = line.map_err(|_| "can't get line")?;
+
+        if let Some((left, right)) = line.split_once("~") {
+            let l: Vec<usize> = left
+                .split(',')
+                .map(|num| num.parse::<usize>().unwrap())
+                .collect();
+
+            let r: Vec<usize> = right
+                .split(',')
+                .map(|num| num.parse::<usize>().unwrap())
+                .collect();
+
+            let first = Coord3::new(l[0], l[1], l[2]);
+            let second = Coord3::new(r[0], r[1], r[2]);
+
+            assert!(first.z <= second.z);
+
+            bricks.insert(Brick::new(id, first, second));
+            id += 1;
         }
     }
-    println!("{}", res);
 
-    Ok(())
+    Ok(bricks)
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Clone, Copy)]
@@ -226,4 +253,3 @@ impl Coord3 {
         Coord3 { x, y, z }
     }
 }
-
