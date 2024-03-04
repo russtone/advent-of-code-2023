@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
     fs::File,
     io::{BufRead, BufReader, Read},
 };
@@ -13,8 +13,84 @@ fn main() -> Result<()> {
     let (settled, supports, supported_by) = drop(&mut bricks);
 
     println!("Part1: {}", part1(&settled, &supports, &supported_by));
+    println!("Part2: {}", part2(&settled, &supports, &supported_by));
 
     Ok(())
+}
+
+fn part2(
+    settled: &BTreeSet<Brick>,
+    supports: &BTreeMap<u32, BTreeSet<u32>>,
+    supported_by: &BTreeMap<u32, BTreeSet<u32>>,
+) -> u64 {
+    let mut res = 0;
+    let counter = Chain::new(supports, supported_by);
+
+    for brick in settled.iter().rev() {
+        res += counter.count(brick.id)
+    }
+
+    res
+}
+
+#[derive(Debug)]
+struct Chain {
+    supports: BTreeMap<u32, BTreeSet<u32>>,
+    supported_by: BTreeMap<u32, BTreeSet<u32>>,
+    cache: HashMap<u32, u64>,
+}
+
+impl Chain {
+    fn new(
+        supports: &BTreeMap<u32, BTreeSet<u32>>,
+        supported_by: &BTreeMap<u32, BTreeSet<u32>>,
+    ) -> Self {
+        Self {
+            supports: supports.clone(),
+            supported_by: supported_by.clone(),
+            cache: HashMap::new(),
+        }
+    }
+
+    fn count(&self, start_id: u32) -> u64 {
+        let mut removed = BTreeSet::new();
+        let mut newly_removed = VecDeque::new();
+
+        removed.insert(start_id);
+        newly_removed.push_back(start_id);
+
+        while newly_removed.len() > 0 {
+            let count = newly_removed.len();
+            let mut i = 0;
+            let mut seen = BTreeSet::new();
+            while let Some(id) = newly_removed.pop_front() {
+                if !seen.insert(id) {
+                    break;
+                }
+                if let Some(supports) = self.supports.get(&id) {
+                    supports
+                        .iter()
+                        .filter(|id| {
+                            self.supported_by.get(id).is_some_and(|ids| {
+                                ids.difference(&removed).into_iter().count() == 0
+                            })
+                        })
+                        .for_each(|&id| {
+                            newly_removed.push_back(id);
+                        });
+                }
+                i += 1;
+
+                if i == count {
+                    break;
+                }
+            }
+            newly_removed.iter().for_each(|&id| {
+                removed.insert(id);
+            })
+        }
+        (removed.len() - 1) as u64
+    }
 }
 
 fn part1(
@@ -24,9 +100,9 @@ fn part1(
 ) -> u64 {
     let mut res = 0;
 
-    for b in settled.iter().rev() {
-        if let Some(sup) = supports.get(&b.id) {
-            if sup
+    for brick in settled.iter().rev() {
+        if let Some(supports) = supports.get(&brick.id) {
+            if supports
                 .iter()
                 .all(|id| supported_by.get(id).is_some_and(|ids| ids.len() > 1))
             {
