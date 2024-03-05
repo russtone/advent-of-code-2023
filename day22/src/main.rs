@@ -24,73 +24,56 @@ fn part2(
     supported_by: &BTreeMap<u32, BTreeSet<u32>>,
 ) -> u64 {
     let mut res = 0;
-    let counter = Chain::new(supports, supported_by);
 
     for brick in settled.iter().rev() {
-        res += counter.count(brick.id)
+        res += count(brick.id, &supports, &supported_by)
     }
 
     res
 }
 
-#[derive(Debug)]
-struct Chain {
-    supports: BTreeMap<u32, BTreeSet<u32>>,
-    supported_by: BTreeMap<u32, BTreeSet<u32>>,
-    cache: HashMap<u32, u64>,
-}
+fn count(
+    start_id: u32,
+    supports: &BTreeMap<u32, BTreeSet<u32>>,
+    supported_by: &BTreeMap<u32, BTreeSet<u32>>,
+) -> u64 {
+    let mut removed = BTreeSet::new();
+    let mut newly_removed = VecDeque::new();
 
-impl Chain {
-    fn new(
-        supports: &BTreeMap<u32, BTreeSet<u32>>,
-        supported_by: &BTreeMap<u32, BTreeSet<u32>>,
-    ) -> Self {
-        Self {
-            supports: supports.clone(),
-            supported_by: supported_by.clone(),
-            cache: HashMap::new(),
-        }
-    }
+    removed.insert(start_id);
+    newly_removed.push_back(start_id);
 
-    fn count(&self, start_id: u32) -> u64 {
-        let mut removed = BTreeSet::new();
-        let mut newly_removed = VecDeque::new();
-
-        removed.insert(start_id);
-        newly_removed.push_back(start_id);
-
-        while newly_removed.len() > 0 {
-            let count = newly_removed.len();
-            let mut i = 0;
-            let mut seen = BTreeSet::new();
-            while let Some(id) = newly_removed.pop_front() {
-                if !seen.insert(id) {
-                    break;
-                }
-                if let Some(supports) = self.supports.get(&id) {
-                    supports
-                        .iter()
-                        .filter(|id| {
-                            self.supported_by.get(id).is_some_and(|ids| {
-                                ids.difference(&removed).into_iter().count() == 0
-                            })
-                        })
-                        .for_each(|&id| {
-                            newly_removed.push_back(id);
-                        });
-                }
-                i += 1;
-
-                if i == count {
-                    break;
-                }
+    while newly_removed.len() > 0 {
+        let count = newly_removed.len();
+        let mut i = 0;
+        let mut seen = BTreeSet::new();
+        while let Some(id) = newly_removed.pop_front() {
+            if !seen.insert(id) {
+                break;
             }
-            newly_removed.iter().for_each(|&id| {
-                removed.insert(id);
-            })
+            if let Some(supports) = supports.get(&id) {
+                supports
+                    .iter()
+                    .filter(|id| {
+                        supported_by
+                            .get(id)
+                            .is_some_and(|ids| ids.difference(&removed).into_iter().count() == 0)
+                    })
+                    .for_each(|&id| {
+                        newly_removed.push_back(id);
+                    });
+            }
+            i += 1;
+
+            if i == count {
+                break;
+            }
         }
-        (removed.len() - 1) as u64
+        newly_removed.iter().for_each(|&id| {
+            removed.insert(id);
+        })
     }
+    (removed.len() - 1) as u64
 }
 
 fn part1(
