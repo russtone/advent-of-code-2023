@@ -1,10 +1,8 @@
 use std::{
     cmp::Ordering,
-    collections::{BinaryHeap, HashMap, VecDeque},
+    collections::{BinaryHeap, HashMap, HashSet},
     fs::File,
     io::{BufRead, BufReader},
-    thread,
-    time::Duration,
 };
 
 type Result<T> = std::result::Result<T, &'static str>;
@@ -14,6 +12,13 @@ fn main() -> Result<()> {
     let lines = BufReader::new(file).lines();
 
     let map = Map::new(lines.map(|line| line.unwrap().chars().collect()).collect());
+
+    println!("Part1: {:?}", part1(&map)?);
+
+    Ok(())
+}
+
+fn part1(map: &Map) -> Result<usize> {
     let mut max_id = 0;
 
     let mut next_id = || {
@@ -22,6 +27,7 @@ fn main() -> Result<()> {
     };
 
     let mut came_from: HashMap<Node, Node> = HashMap::new();
+
     let mut queue = BinaryHeap::new();
     queue.push(Node::new(map.start, 0));
 
@@ -33,7 +39,7 @@ fn main() -> Result<()> {
         }
 
         let mut i = 0;
-        for next_p in map.get_next(&cur_p).iter() {
+        for next_p in map.get_next(&cur_p, true).iter() {
             // Don't go back.
             if came_from
                 .get(&cur_node)
@@ -44,8 +50,8 @@ fn main() -> Result<()> {
 
             let id = if i == 0 { cur_node.id } else { next_id() };
 
-            let next_node = Node::new(*next_p, id);
 
+            let next_node = Node::new(*next_p, id);
             came_from.insert(next_node, cur_node);
 
             if *next_p != map.end {
@@ -56,15 +62,11 @@ fn main() -> Result<()> {
         }
     }
 
-    let res = (0..=max_id)
+    Ok((0..=max_id)
         .into_iter()
         .map(|id| reconstruct_path(&came_from, &Node::new(map.end, id)).len() - 1)
         .max()
-        .unwrap();
-
-    println!("{:?}", res);
-
-    Ok(())
+        .unwrap())
 }
 
 fn reconstruct_path(came_from: &HashMap<Node, Node>, start: &Node) -> Vec<Node> {
@@ -109,71 +111,95 @@ impl Map {
         }
     }
 
-    fn up(&self, p: &Point) -> Option<Point> {
+    fn up(&self, p: &Point, slopes: bool) -> Option<Point> {
         if p.row == 0 {
             return None;
         }
         let c = self.data[p.row - 1][p.col];
 
-        if c == '.' || c == '^' {
-            return Some(Point::new(p.row - 1, p.col));
+        if slopes {
+            if c == '.' || c == '^' {
+                return Some(Point::new(p.row - 1, p.col));
+            }
+        } else {
+            if c != '#' {
+                return Some(Point::new(p.row - 1, p.col));
+            }
         }
 
         None
     }
 
-    fn down(&self, p: &Point) -> Option<Point> {
+    fn down(&self, p: &Point, slopes: bool) -> Option<Point> {
         if p.row == self.rows - 1 {
             return None;
         }
         let c = self.data[p.row + 1][p.col];
 
-        if c == '.' || c == 'v' {
-            return Some(Point::new(p.row + 1, p.col));
+        if slopes {
+            if c == '.' || c == 'v' {
+                return Some(Point::new(p.row + 1, p.col));
+            }
+        } else {
+            if c != '#' {
+                return Some(Point::new(p.row + 1, p.col));
+            }
         }
 
         None
     }
 
-    fn left(&self, p: &Point) -> Option<Point> {
+    fn left(&self, p: &Point, slopes: bool) -> Option<Point> {
         if p.col == 0 {
             return None;
         }
         let c = self.data[p.row][p.col - 1];
 
-        if c == '.' || c == '<' {
-            return Some(Point::new(p.row, p.col - 1));
+        if slopes {
+            if c == '.' || c == '<' {
+                return Some(Point::new(p.row, p.col - 1));
+            }
+        } else {
+            if c != '#' {
+                return Some(Point::new(p.row, p.col - 1));
+            }
         }
 
         None
     }
 
-    fn right(&self, p: &Point) -> Option<Point> {
+    fn right(&self, p: &Point, slopes: bool) -> Option<Point> {
         if p.col == self.cols - 1 {
             return None;
         }
         let c = self.data[p.row][p.col + 1];
 
-        if c == '.' || c == '>' {
-            return Some(Point::new(p.row, p.col + 1));
+        if slopes {
+            if c == '.' || c == '>' {
+                return Some(Point::new(p.row, p.col + 1));
+            }
+        } else {
+            if c != '#' {
+                return Some(Point::new(p.row, p.col + 1));
+            }
         }
 
         None
     }
 
-    fn get_next(&self, p: &Point) -> Vec<Point> {
+    fn get_next(&self, p: &Point, slopes: bool) -> Vec<Point> {
         let mut res = Vec::new();
 
-        if let Some(p) = self.up(p) {
+        if let Some(p) = self.up(p, slopes) {
             res.push(p);
         }
-        if let Some(p) = self.down(p) {
+        if let Some(p) = self.down(p, slopes) {
             res.push(p);
         }
-        if let Some(p) = self.left(p) {
+        if let Some(p) = self.left(p, slopes) {
             res.push(p);
         }
-        if let Some(p) = self.right(p) {
+        if let Some(p) = self.right(p, slopes) {
             res.push(p);
         }
 
