@@ -18,6 +18,12 @@ fn main() -> Result<(), Error> {
         data.push(Hailstone::new(point, veclocity));
     }
 
+    println!("{:?}", part1(&data)?);
+
+    Ok(())
+}
+
+fn part1(data: &[Hailstone]) -> Result<u64, Error> {
     let mut res = 0;
     let min = 200000000000000.0;
     let max = 400000000000000.0;
@@ -36,9 +42,7 @@ fn main() -> Result<(), Error> {
         }
     }
 
-    println!("{:?}", res);
-
-    Ok(())
+    Ok(res)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -58,7 +62,7 @@ impl Line {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 struct Hailstone {
     point: Point,
     velocity: Veclocity,
@@ -70,25 +74,25 @@ impl Hailstone {
     }
 
     fn line(&self) -> Line {
-        assert!(self.velocity.vx != 0 && self.velocity.vy != 0);
+        assert!(self.velocity.vx != 0.0 && self.velocity.vy != 0.0);
         let a: f64 = self.velocity.vy as f64 / self.velocity.vx as f64;
         let b = self.point.y as f64 - self.point.x as f64 * a;
         return Line { a, b };
     }
 
     fn is_future(&self, p: (f64, f64)) -> bool {
-        return ((self.velocity.vx > 0 && p.0 > self.point.x as f64)
-            || (self.velocity.vx < 0 && p.0 < self.point.x as f64))
-            && ((self.velocity.vy > 0 && p.1 > self.point.y as f64)
-                || (self.velocity.vy < 0 && p.1 < self.point.y as f64));
+        return ((self.velocity.vx > 0.0 && p.0 > self.point.x as f64)
+            || (self.velocity.vx < 0.0 && p.0 < self.point.x as f64))
+            && ((self.velocity.vy > 0.0 && p.1 > self.point.y as f64)
+                || (self.velocity.vy < 0.0 && p.1 < self.point.y as f64));
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 struct Point {
-    x: isize,
-    y: isize,
-    z: isize,
+    x: f64,
+    y: f64,
+    z: f64,
 }
 
 impl FromStr for Point {
@@ -101,26 +105,26 @@ impl FromStr for Point {
                 .next()
                 .ok_or(Error::Parse)?
                 .trim_start()
-                .parse::<isize>()?,
+                .parse::<f64>()?,
             y: iter
                 .next()
                 .ok_or(Error::Parse)?
                 .trim_start()
-                .parse::<isize>()?,
+                .parse::<f64>()?,
             z: iter
                 .next()
                 .ok_or(Error::Parse)?
                 .trim_start()
-                .parse::<isize>()?,
+                .parse::<f64>()?,
         })
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 struct Veclocity {
-    vx: isize,
-    vy: isize,
-    vz: isize,
+    vx: f64,
+    vy: f64,
+    vz: f64,
 }
 
 impl FromStr for Veclocity {
@@ -133,17 +137,17 @@ impl FromStr for Veclocity {
                 .next()
                 .ok_or(Error::Parse)?
                 .trim_start()
-                .parse::<isize>()?,
+                .parse::<f64>()?,
             vy: iter
                 .next()
                 .ok_or(Error::Parse)?
                 .trim_start()
-                .parse::<isize>()?,
+                .parse::<f64>()?,
             vz: iter
                 .next()
                 .ok_or(Error::Parse)?
                 .trim_start()
-                .parse::<isize>()?,
+                .parse::<f64>()?,
         })
     }
 }
@@ -151,7 +155,7 @@ impl FromStr for Veclocity {
 #[derive(Debug)]
 enum Error {
     Io(io::Error),
-    ParseInt(num::ParseIntError),
+    ParseFloat(num::ParseFloatError),
     Parse,
 }
 
@@ -161,8 +165,8 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<num::ParseIntError> for Error {
-    fn from(value: num::ParseIntError) -> Self {
-        Error::ParseInt(value)
+impl From<num::ParseFloatError> for Error {
+    fn from(value: num::ParseFloatError) -> Self {
+        Error::ParseFloat(value)
     }
 }
