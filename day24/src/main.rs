@@ -5,6 +5,8 @@ use std::{
     str::FromStr,
 };
 
+use nalgebra::{ComplexField, Matrix4, Vector4};
+
 fn main() -> Result<(), Error> {
     let file = File::open("files/input.txt")?;
     let lines = BufReader::new(file).lines();
@@ -18,9 +20,69 @@ fn main() -> Result<(), Error> {
         data.push(Hailstone::new(point, veclocity));
     }
 
-    println!("{:?}", part1(&data)?);
+    println!("Part 1: {:?}", part1(&data)?);
+    println!("Part 2: {:?}", part2(&data)?);
 
     Ok(())
+}
+
+/*
+  1. (X - x) / (dx - DX) = (Y - y) / (dy - DY)
+  2. (X - x) * (dy - DY) = (Y - y) * (dx - DX)
+  3. X * dy - X * DY - x * dy + x * DY = Y * dx - Y * DX - y * dx + y * DX
+  4. Y * DX - X * DY = Y * dx - X * dy + y * DX - x * DY + x * dy - y * dx
+  5. Y * DX - X * DY = Y * dx' - X * dy' + y' * DX - x' * DY + x' * dy - y' * dx
+  6. X * (dy' - dy) + Y * (dx - dx') + DX * (y - y') + DY * (x' - x) + x * dy - x' * dy' - y * dx + y' * dx' = 0
+*/
+fn part2(data: &[Hailstone]) -> Result<u64, Error> {
+    let h = data.first().unwrap();
+
+    let mut coeffs1 = Vec::new();
+    let mut consts1 = Vec::new();
+    let mut coeffs2 = Vec::new();
+    let mut consts2 = Vec::new();
+
+    for i in 2..=5 {
+        let h1 = data[i];
+        coeffs1.push(vec![
+            h1.velocity.vy - h.velocity.vy,
+            h.velocity.vx - h1.velocity.vx,
+            h.point.y - h1.point.y,
+            h1.point.x - h.point.x,
+        ]);
+        consts1.push(
+            h.point.x * h.velocity.vy - h1.point.x * h1.velocity.vy - h.point.y * h.velocity.vx
+                + h1.point.y * h1.velocity.vx,
+        );
+
+        coeffs2.push(vec![
+            h1.velocity.vz - h.velocity.vz,
+            h.velocity.vx - h1.velocity.vx,
+            h.point.z - h1.point.z,
+            h1.point.x - h.point.x,
+        ]);
+        consts2.push(
+            h.point.x * h.velocity.vz - h1.point.x * h1.velocity.vz - h.point.z * h.velocity.vx
+                + h1.point.z * h1.velocity.vx,
+        );
+    }
+
+    let s1 = solve(&coeffs1.concat(), &consts1);
+    let s2 = solve(&coeffs2.concat(), &consts2);
+
+    Ok((-s1[0] - s1[1] - s2[1]) as u64)
+}
+
+fn solve(coeffs: &[f64], consts: &[f64]) -> Vec<f64> {
+    let matrix = Matrix4::from_row_slice(&coeffs);
+    let rhs = Vector4::from_column_slice(&consts);
+
+    let solution = (matrix.try_inverse().unwrap() * rhs)
+        .iter()
+        .map(|&v| v.round())
+        .collect::<Vec<f64>>();
+
+    solution
 }
 
 fn part1(data: &[Hailstone]) -> Result<u64, Error> {
